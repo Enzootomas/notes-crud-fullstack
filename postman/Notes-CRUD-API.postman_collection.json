@@ -1,0 +1,105 @@
+{
+  "info": {
+    "_postman_id": "8b7d4c10-5a2e-4f9b-9c12-0005a05c2026",
+    "name": "Notes CRUD API — Aula 05 (Frameworks Front-end)",
+    "description": "Coleção oficial documentando as operações CRUD (Create, Read, Update, Delete) da API REST de Notas construída com Node.js, Express.js e persistência em JSON (data.json).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "noteId",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Listar todas as notas (READ — GET /api/notes)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/notes",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notes"]
+        },
+        "description": "Retorna o array completo de notas armazenadas em data.json.\n\nCódigos de resposta:\n- 200 OK: Lista de notas retornada em JSON."
+      }
+    },
+    {
+      "name": "2. Buscar nota por ID (READ — GET /api/notes/:id)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/notes/{{noteId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notes", "{{noteId}}"]
+        },
+        "description": "Busca uma nota específica pelo identificador único (:id).\n\nParâmetros de rota:\n- id (string): Identificador da nota.\n\nCódigos de resposta:\n- 200 OK: Objeto da nota encontrada.\n- 404 Not Found: { \"erro\": \"Nota não encontrada\" }."
+      }
+    },
+    {
+      "name": "3. Criar nova nota (CREATE — POST /api/notes)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"titulo\": \"Estudar Aula 05\",\n  \"texto\": \"Revisar rotas CRUD no Express e testar coleção no Postman.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/notes",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notes"]
+        },
+        "description": "Cria uma nova nota com ID gerado via Date.now().toString() e timestamp ISO em criadoEm.\n\nParâmetros no corpo (JSON):\n- titulo (string, obrigatório): Título da nota.\n- texto (string, obrigatório): Conteúdo da nota.\n\nCódigos de resposta:\n- 200 OK: Retorna o objeto recém-criado persistido em data.json."
+      }
+    },
+    {
+      "name": "4. Atualizar nota existente (UPDATE — PUT /api/notes/:id)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"titulo\": \"Estudar Aula 05 (Atualizado)\",\n  \"texto\": \"Coleção Postman testada e validada com sucesso.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/notes/{{noteId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notes", "{{noteId}}"]
+        },
+        "description": "Atualiza título e texto de uma nota existente identificada por :id.\n\nParâmetros:\n- Rota :id (string): ID da nota.\n- Body JSON: titulo (string) e texto (string).\n\nCódigos de resposta:\n- 200 OK: Retorna o objeto atualizado.\n- 404 Not Found: { \"erro\": \"Nota não encontrada\" }."
+      }
+    },
+    {
+      "name": "5. Excluir nota (DELETE — DELETE /api/notes/:id)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/notes/{{noteId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notes", "{{noteId}}"]
+        },
+        "description": "Remove a nota correspondente ao :id informado e persiste o novo array em data.json.\n\nParâmetros de rota:\n- id (string): Identificador da nota.\n\nCódigos de resposta:\n- 200 OK: { \"mensagem\": \"Nota removida\" }."
+      }
+    }
+  ]
+}
