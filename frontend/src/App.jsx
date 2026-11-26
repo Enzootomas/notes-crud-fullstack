@@ -1,166 +1,378 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 
-const API_URL =
+const DEFAULT_API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:3000/api/notes";
 
+function formatarData(isoString) {
+  if (!isoString) return "Data não informada";
+  const data = new Date(isoString);
+  if (Number.isNaN(data.getTime())) return isoString;
+  return data.toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
 function App() {
+  const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
   const [notas, setNotas] = useState([]);
   const [titulo, setTitulo] = useState("");
   const [texto, setTexto] = useState("");
+  const [busca, setBusca] = useState("");
   const [editandoId, setEditandoId] = useState(null);
+  const [notaDetalhe, setNotaDetalhe] = useState(null);
+  const [carregando, setCarregando] = useState(false);
+  const [erroApi, setErroApi] = useState("");
+  const [erroFormulario, setErroFormulario] = useState("");
+  const [mensagemSucesso, setMensagemSucesso] = useState("");
 
-  async function carregarNotas() {
+  const baseLimpa = apiUrl.trim().replace(/\/+$/, "");
+
+  const carregarNotas = useCallback(async () => {
+    setCarregando(true);
+    setErroApi("");
+
     try {
-      const resposta = await fetch(API_URL);
+      const resposta = await fetch(baseLimpa);
+      if (!resposta.ok) {
+        throw new Error(`Erro HTTP ${resposta.status} ao listar notas.`);
+      }
       const dados = await resposta.json();
-      setNotas(dados);
+      setNotas(Array.isArray(dados) ? dados : []);
     } catch (erro) {
-      console.error("Erro ao carregar notas:", erro);
+      setErroApi(
+        erro instanceof Error
+          ? erro.message
+          : "Não foi possível conectar ao servidor Express."
+      );
+    } finally {
+      setCarregando(false);
     }
-  }
+  }, [baseLimpa]);
 
   useEffect(() => {
     carregarNotas();
-  }, []);
+  }, [carregarNotas]);
+
+  function exibirFeedback(msg) {
+    setMensagemSucesso(msg);
+    setTimeout(() => {
+      setMensagemSucesso("");
+    }, 3000);
+  }
 
   async function salvarNota(evento) {
     evento.preventDefault();
+    setErroFormulario("");
 
     if (!titulo.trim() || !texto.trim()) {
-      alert("Preencha o título e o texto.");
+      setErroFormulario("Preencha o título e o conteúdo da nota antes de salvar.");
       return;
     }
 
-    if (editandoId) {
-      await fetch(`${API_URL}/${editandoId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          titulo,
-          texto,
-        }),
-      });
+    try {
+      if (editandoId) {
+        const resposta = await fetch(`${baseLimpa}/${editandoId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            titulo: titulo.trim(),
+            texto: texto.trim(),
+          }),
+        });
 
-      setEditandoId(null);
-    } else {
-      await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          titulo,
-          texto,
-        }),
-      });
+        if (!resposta.ok) {
+          throw new Error(`Falha ao atualizar nota (HTTP ${resposta.status}).`);
+        }
+
+        setEditandoId(null);
+        exibirFeedback("Nota atualizada com sucesso!");
+      } else {
+        const resposta = await fetch(baseLimpa, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            titulo: titulo.trim(),
+            texto: texto.trim(),
+          }),
+        });
+
+        if (!resposta.ok) {
+          throw new Error(`Falha ao criar nota (HTTP ${resposta.status}).`);
+        }
+
+        exibirFeedback("Nova nota criada com sucesso!");
+      }
+
+      setTitulo("");
+      setTexto("");
+      await carregarNotas();
+    } catch (erro) {
+      setErroFormulario(
+        erro instanceof Error ? erro.message : "Erro ao salvar a nota."
+      );
     }
-
-    setTitulo("");
-    setTexto("");
-
-    carregarNotas();
   }
 
   function editarNota(nota) {
     setTitulo(nota.titulo);
     setTexto(nota.texto);
     setEditandoId(nota.id);
+    setErroFormulario("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function inspecionarNotaPorId(id) {
+    try {
+      const resposta = await fetch(`${baseLimpa}/${id}`);
+      if (!resposta.ok) {
+        throw new Error(`Nota não encontrada (HTTP ${resposta.status}).`);
+      }
+      const dados = await resposta.json();
+      setNotaDetalhe(dados);
+    } catch (erro) {
+      setErroApi(
+        erro instanceof Error ? erro.message : "Erro ao consultar nota por ID."
+      );
+    }
   }
 
   async function excluirNota(id) {
-    const confirmar = window.confirm(
-      "Deseja realmente excluir esta nota?"
-    );
+    const confirmar = window.confirm("Deseja realmente excluir esta nota?");
+    if (!confirmar) return;
 
-    if (!confirmar) {
-      return;
+    try {
+      const resposta = await fetch(`${baseLimpa}/${id}`, {
+        method: "DELETE",
+      });
+      if (!resposta.ok) {
+        throw new Error(`Erro ao excluir nota (HTTP ${resposta.status}).`);
+      }
+
+      if (notaDetalhe?.id === id) {
+        setNotaDetalhe(null);
+      }
+      exibirFeedback("Nota excluída com sucesso.");
+      await carregarNotas();
+    } catch (erro) {
+      setErroApi(
+        erro instanceof Error ? erro.message : "Erro ao excluir a nota."
+      );
     }
-
-    await fetch(`${API_URL}/${id}`, {
-      method: "DELETE",
-    });
-
-    carregarNotas();
   }
 
   function cancelarEdicao() {
     setTitulo("");
     setTexto("");
     setEditandoId(null);
+    setErroFormulario("");
   }
 
+  const notasFiltradas = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return notas;
+    return notas.filter(
+      (n) =>
+        n.titulo.toLowerCase().includes(termo) ||
+        n.texto.toLowerCase().includes(termo)
+    );
+  }, [notas, busca]);
+
   return (
-    <main className="container">
-      <h1>Minhas Notas</h1>
+    <div className="pagina-notas">
+      <main className="container">
+        <header className="cabecalho">
+          <span className="selo-aula">AULA 05 — CRIANDO APIS PARA O FRONT-END</span>
+          <h1>Gerenciador de Notas CRUD</h1>
+          <p className="subtitulo">
+            Integração completa entre <strong>React + Vite</strong> e{" "}
+            <strong>Node.js + Express.js</strong> com persistência em{" "}
+            <code>data.json</code>.
+          </p>
+        </header>
 
-      <p className="subtitulo">
-        Aplicação CRUD com React e Express
-      </p>
+        <section className="barra-endpoint" aria-label="Configuração da API">
+          <div className="endpoint-topo">
+            <label htmlFor="endpoint-input">Endpoint da API REST</label>
+            <div className="endpoint-atalhos">
+              <button
+                type="button"
+                className="btn-atalho"
+                onClick={() => setApiUrl("http://localhost:3000/api/notes")}
+              >
+                Local (:3000)
+              </button>
+              <button
+                type="button"
+                className="btn-atalho"
+                onClick={carregarNotas}
+              >
+                Recarregar
+              </button>
+            </div>
+          </div>
+          <input
+            id="endpoint-input"
+            type="url"
+            value={apiUrl}
+            onChange={(e) => setApiUrl(e.target.value)}
+            placeholder="http://localhost:3000/api/notes"
+          />
+        </section>
 
-      <form onSubmit={salvarNota} className="formulario">
-        <input
-          type="text"
-          placeholder="Título da nota"
-          value={titulo}
-          onChange={(e) => setTitulo(e.target.value)}
-        />
+        {erroApi && (
+          <div className="alerta-erro" role="alert">
+            <strong>Falha de conexão com a API:</strong> {erroApi}
+          </div>
+        )}
 
-        <textarea
-          placeholder="Digite o conteúdo da nota..."
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-        />
+        {mensagemSucesso && (
+          <div className="alerta-sucesso" role="status">
+            {mensagemSucesso}
+          </div>
+        )}
 
-        <div className="botoes-formulario">
-          <button type="submit">
-            {editandoId ? "Atualizar nota" : "Adicionar nota"}
-          </button>
+        <div className="grade-principal">
+          <section className="painel-formulario">
+            <h2>{editandoId ? "✏️ Editando nota" : "➕ Nova nota"}</h2>
 
-          {editandoId && (
-            <button
-              type="button"
-              className="cancelar"
-              onClick={cancelarEdicao}
-            >
-              Cancelar
-            </button>
-          )}
-        </div>
-      </form>
+            <form onSubmit={salvarNota} className="formulario">
+              <label htmlFor="campo-titulo">Título da nota</label>
+              <input
+                id="campo-titulo"
+                type="text"
+                placeholder="Ex.: Revisar rotas Express"
+                value={titulo}
+                onChange={(e) => setTitulo(e.target.value)}
+              />
 
-      <section className="lista-notas">
-        {notas.length === 0 ? (
-          <p>Nenhuma nota cadastrada.</p>
-        ) : (
-          notas.map((nota) => (
-            <article className="nota" key={nota.id}>
-              <h2>{nota.titulo}</h2>
+              <label htmlFor="campo-texto">Conteúdo</label>
+              <textarea
+                id="campo-texto"
+                placeholder="Digite o conteúdo detalhado da nota..."
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+              />
 
-              <p>{nota.texto}</p>
+              {erroFormulario && (
+                <p className="erro-form" role="alert">
+                  {erroFormulario}
+                </p>
+              )}
 
-              <div className="acoes">
-                <button
-                  className="editar"
-                  onClick={() => editarNota(nota)}
-                >
-                  Editar
+              <div className="botoes-formulario">
+                <button type="submit" className="btn-primario">
+                  {editandoId ? "Salvar alterações (PUT)" : "Adicionar nota (POST)"}
                 </button>
 
-                <button
-                  className="excluir"
-                  onClick={() => excluirNota(nota.id)}
-                >
-                  Excluir
+                {editandoId && (
+                  <button
+                    type="button"
+                    className="btn-cancelar"
+                    onClick={cancelarEdicao}
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+          </section>
+
+          <section className="painel-lista">
+            <div className="topo-lista">
+              <div>
+                <h2>Notas armazenadas</h2>
+                <span className="contador-notas">
+                  {notasFiltradas.length} de {notas.length} registro(s)
+                </span>
+              </div>
+
+              <input
+                type="search"
+                className="campo-busca"
+                placeholder="Filtrar notas..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+              />
+            </div>
+
+            {carregando ? (
+              <div className="estado-vazio">Carregando notas da API...</div>
+            ) : notasFiltradas.length === 0 ? (
+              <div className="estado-vazio">
+                Nenhuma nota encontrada para o filtro atual.
+              </div>
+            ) : (
+              <div className="lista-notas">
+                {notasFiltradas.map((nota) => (
+                  <article className="nota" key={nota.id}>
+                    <div className="nota-topo">
+                      <h3>{nota.titulo}</h3>
+                      <span className="nota-id">#{nota.id}</span>
+                    </div>
+
+                    <p>{nota.texto}</p>
+
+                    <div className="nota-rodape">
+                      <small>Criado em: {formatarData(nota.criadoEm)}</small>
+
+                      <div className="acoes">
+                        <button
+                          type="button"
+                          className="detalhes"
+                          onClick={() => inspecionarNotaPorId(nota.id)}
+                        >
+                          GET /:id
+                        </button>
+                        <button
+                          type="button"
+                          className="editar"
+                          onClick={() => editarNota(nota)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="excluir"
+                          onClick={() => excluirNota(nota.id)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        {notaDetalhe && (
+          <div
+            className="modal-fundo"
+            onClick={() => setNotaDetalhe(null)}
+            role="presentation"
+          >
+            <div
+              className="modal-detalhe"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Detalhes da nota por ID"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-topo">
+                <h3>Consulta Individual — GET /api/notes/{notaDetalhe.id}</h3>
+                <button type="button" onClick={() => setNotaDetalhe(null)}>
+                  Fechar
                 </button>
               </div>
-            </article>
-          ))
+              <pre>{JSON.stringify(notaDetalhe, null, 2)}</pre>
+            </div>
+          </div>
         )}
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
 
