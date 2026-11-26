@@ -2,6 +2,9 @@
 
 Aplicação completa de gerenciamento de notas (**CRUD**: *Create, Read, Update, Delete*) desenvolvida na **Aula 05 (Criando APIs para o Front-end)** da disciplina de **Frameworks Front-end** (SENAI).
 
+- **Deploy Front-end em Produção (Vercel):** [🌐 Ver online](https://notes-crud-fullstack.vercel.app)
+- **Repositório GitHub:** [🔗 Repositório](https://github.com/Enzootomas/notes-crud-fullstack)
+
 ---
 
 ## 📸 Captura de Tela da Aplicação em Funcionamento
